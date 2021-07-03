@@ -99,7 +99,7 @@ class DocumentParser implements ParserInterface
      *
      * @return \Swis\JsonApi\Client\Interfaces\DocumentInterface
      */
-    public function parse(string $json): DocumentInterface
+    public function deserialize(string $json): DocumentInterface
     {
         $data = $this->decodeJson($json);
 
