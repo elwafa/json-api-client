@@ -2,6 +2,8 @@
 
 namespace Swis\JsonApi\Client;
 
+use Swis\JsonApi\Client\Exceptions\TypeMappingException;
+use Swis\JsonApi\Client\Interfaces\ItemInterface;
 use Swis\JsonApi\Client\Interfaces\TypeMapperInterface;
 
 class TypeMapper implements TypeMapperInterface
@@ -14,9 +16,19 @@ class TypeMapper implements TypeMapperInterface
     /**
      * @param string $type
      * @param string $class
+     *
+     * @throws \Swis\JsonApi\Client\Exceptions\TypeMappingException
      */
-    public function setMapping(string $type, string $class)
+    public function setMapping(string $type, string $class): void
     {
+        if (!class_exists($class)) {
+            throw new TypeMappingException(sprintf('Class %s not found.', $class));
+        }
+
+        if (!is_subclass_of($class, ItemInterface::class)) {
+            throw new TypeMappingException(sprintf('Class %s must implement %s.', $class, ItemInterface::class));
+        }
+
         $this->typeMappings[$type] = $class;
     }
 
@@ -25,7 +37,7 @@ class TypeMapper implements TypeMapperInterface
      *
      * @return bool
      */
-    public function hasMapping(string $type)
+    public function hasMapping(string $type): bool
     {
         return array_key_exists($type, $this->typeMappings);
     }
@@ -33,7 +45,7 @@ class TypeMapper implements TypeMapperInterface
     /**
      * @param string $type
      */
-    public function removeMapping(string $type)
+    public function removeMapping(string $type): void
     {
         unset($this->typeMappings[$type]);
     }
@@ -41,22 +53,16 @@ class TypeMapper implements TypeMapperInterface
     /**
      * @param string $type
      *
-     * @throws \InvalidArgumentException
+     *@throws \Swis\JsonApi\Client\Exceptions\TypeMappingException
      *
      * @return \Swis\JsonApi\Client\Interfaces\ItemInterface
      */
-    public function getMapping(string $type)
+    public function getMapping(string $type): ItemInterface
     {
         if (!array_key_exists($type, $this->typeMappings)) {
-            throw new \InvalidArgumentException(sprintf('No mapping for type %s', $type));
+            throw new TypeMappingException(sprintf('No mapping for type %s', $type));
         }
 
-        $class = $this->typeMappings[$type];
-
-        if (!class_exists($class)) {
-            throw new \InvalidArgumentException(sprintf('Class %s not found.', $class));
-        }
-
-        return new $class();
+        return new $this->typeMappings[$type]();
     }
 }

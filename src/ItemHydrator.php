@@ -2,11 +2,13 @@
 
 namespace Swis\JsonApi\Client;
 
-use Swis\JsonApi\Client\Interfaces\ItemInterface;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use Swis\JsonApi\Client\Interfaces\RelationInterface;
+use Swis\JsonApi\Client\Exceptions\HydrationException;
+use Swis\JsonApi\Client\Interfaces\ItemInterface;
+use Swis\JsonApi\Client\Interfaces\ManyRelationInterface;
+use Swis\JsonApi\Client\Interfaces\OneRelationInterface;
 use Swis\JsonApi\Client\Interfaces\TypeMapperInterface;
-use Swis\JsonApi\Client\Items\JenssegersItem;
 use Swis\JsonApi\Client\Relations\HasManyRelation;
 use Swis\JsonApi\Client\Relations\HasOneRelation;
 use Swis\JsonApi\Client\Relations\MorphToManyRelation;
@@ -30,15 +32,20 @@ class ItemHydrator
     /**
      * @param \Swis\JsonApi\Client\Interfaces\ItemInterface $item
      * @param array                                         $attributes
+     * @param string|null                                   $id
      *
-     * @throws \Exception
+     * @throws \Swis\JsonApi\Client\Exceptions\HydrationException
      *
      * @return \Swis\JsonApi\Client\Interfaces\ItemInterface
      */
-    public function hydrate(ItemInterface $item, array $attributes): ItemInterface
+    public function hydrate(ItemInterface $item, array $attributes, string $id = null): ItemInterface
     {
         $this->fill($item, $attributes);
         $this->fillRelations($item, $attributes);
+
+        if ($id !== null && $id !== '') {
+            $item->setId($id);
+        }
 
         return $item;
     }
@@ -47,9 +54,9 @@ class ItemHydrator
      * @param \Swis\JsonApi\Client\Interfaces\ItemInterface $item
      * @param array                                         $attributes
      */
-    protected function fill(ItemInterface $item, array $attributes)
+    protected function fill(ItemInterface $item, array $attributes): void
     {
-        $item->fill(array_diff_key($attributes, array_combine($item->getAvailableRelations(), $item->getAvailableRelations())));
+        $item->fill(Arr::except($attributes, $item->getAvailableRelations()));
     }
 
     /**
@@ -58,9 +65,9 @@ class ItemHydrator
      * @param \Swis\JsonApi\Client\Interfaces\ItemInterface $item
      * @param array                                         $attributes
      *
-     * @throws \Exception
+     * @throws \Swis\JsonApi\Client\Exceptions\HydrationException
      */
-    protected function fillRelations(ItemInterface $item, array $attributes)
+    protected function fillRelations(ItemInterface $item, array $attributes): void
     {
         // Fill Relations
         foreach ($item->getAvailableRelations() as $availableRelation) {
@@ -71,15 +78,25 @@ class ItemHydrator
 
             $relation = $this->getRelationFromItem($item, $availableRelation);
 
+            // The relation should be unset
+            if (
+                ($relation instanceof OneRelationInterface && $attributes[$availableRelation] === null) ||
+                ($relation instanceof ManyRelationInterface && $attributes[$availableRelation] === [])
+            ) {
+                $relation->dissociate();
+
+                continue;
+            }
+
             // It is a valid relation
             if ($relation instanceof HasOneRelation) {
-                $this->hydrateHasOneRelation($item, $attributes, $relation, $availableRelation);
+                $this->hydrateHasOneRelation($relation, $attributes[$availableRelation]);
             } elseif ($relation instanceof HasManyRelation) {
-                $this->hydrateHasManyRelation($attributes, $availableRelation, $relation);
+                $this->hydrateHasManyRelation($relation, $attributes[$availableRelation]);
             } elseif ($relation instanceof MorphToRelation) {
-                $this->hydrateMorphToRelation($attributes, $relation, $availableRelation);
+                $this->hydrateMorphToRelation($relation, $attributes[$availableRelation]);
             } elseif ($relation instanceof MorphToManyRelation) {
-                $this->hydrateMorphToManyRelation($attributes, $relation, $availableRelation);
+                $this->hydrateMorphToManyRelation($relation, $attributes[$availableRelation]);
             }
         }
     }
@@ -88,127 +105,105 @@ class ItemHydrator
      * @param \Swis\JsonApi\Client\Interfaces\ItemInterface $item
      * @param string                                        $availableRelation
      *
-     * @throws \Exception
+     * @throws \Swis\JsonApi\Client\Exceptions\HydrationException
      *
-     * @return \Swis\JsonApi\Client\Interfaces\RelationInterface
+     * @return \Swis\JsonApi\Client\Interfaces\OneRelationInterface|\Swis\JsonApi\Client\Interfaces\ManyRelationInterface
      */
-    protected function getRelationFromItem(ItemInterface $item, string $availableRelation): RelationInterface
+    protected function getRelationFromItem(ItemInterface $item, string $availableRelation)
     {
         $method = Str::camel($availableRelation);
         if (!method_exists($item, $method)) {
-            throw new \Exception(sprintf('Method %s not found on %s', $method, get_class($item)));
+            throw new HydrationException(sprintf('Method %s not found on %s', $method, get_class($item)));
         }
 
         return $item->$method();
     }
 
     /**
-     * @param \Swis\JsonApi\Client\Interfaces\ItemInterface $item
-     * @param array                                         $attributes
      * @param \Swis\JsonApi\Client\Relations\HasOneRelation $relation
-     * @param string                                        $availableRelation
+     * @param array|string                                  $attributes
      *
-     * @throws \InvalidArgumentException
+     * @throws \Swis\JsonApi\Client\Exceptions\HydrationException
      */
-    protected function hydrateHasOneRelation(
-        ItemInterface $item,
-        array $attributes,
-        HasOneRelation $relation,
-        string $availableRelation
-    ) {
-        if (is_array($attributes[$availableRelation])) {
-            $relationItem = $this->buildRelationItem($relation, $attributes[$availableRelation]);
-            $relation->associate($relationItem);
+    protected function hydrateHasOneRelation(HasOneRelation $relation, $attributes): void
+    {
+        if (is_array($attributes)) {
+            $relationItem = $this->buildItem($relation->getType(), $attributes);
         } else {
-            $relation->setId($attributes[$availableRelation]);
-            $item->setAttribute($availableRelation.'_id', $attributes[$availableRelation]);
-        }
-    }
-
-    /**
-     * @param array                                          $attributes
-     * @param string                                         $availableRelation
-     * @param \Swis\JsonApi\Client\Relations\HasManyRelation $relation
-     *
-     * @throws \InvalidArgumentException
-     */
-    protected function hydrateHasManyRelation(array $attributes, string $availableRelation, HasManyRelation $relation)
-    {
-        foreach ($attributes[$availableRelation] as $relationData) {
-            if (is_array($relationData)) {
-                $relationItem = $this->buildRelationItem($relation, $relationData);
-            } else {
-                $relationItem = $this->buildRelationItem($relation, ['id' => $relationData]);
-            }
-
-            $relation->associate($relation->getIncluded()->push($relationItem));
-        }
-    }
-
-    /**
-     * @param array                                          $attributes
-     * @param \Swis\JsonApi\Client\Relations\MorphToRelation $relation
-     * @param string                                         $availableRelation
-     *
-     * @throws \InvalidArgumentException
-     */
-    protected function hydrateMorphToRelation(array $attributes, MorphToRelation $relation, string $availableRelation)
-    {
-        if (!array_key_exists('type', $attributes[$availableRelation])) {
-            throw new \InvalidArgumentException('Always provide a "type" attribute in a morphTo relationship');
+            $relationItem = $this->buildItem($relation->getType(), ['id' => $attributes]);
         }
 
-        $relationItem = $this->buildRelationItem($relation, $attributes[$availableRelation], $attributes[$availableRelation]['type']);
         $relation->associate($relationItem);
     }
 
     /**
-     * @param array                                              $attributes
-     * @param \Swis\JsonApi\Client\Relations\MorphToManyRelation $relation
-     * @param string                                             $availableRelation
+     * @param \Swis\JsonApi\Client\Relations\HasManyRelation $relation
+     * @param array                                          $attributes
      *
-     * @throws \InvalidArgumentException
+     * @throws \Swis\JsonApi\Client\Exceptions\HydrationException
      */
-    protected function hydrateMorphToManyRelation(array $attributes, MorphToManyRelation $relation, string $availableRelation)
+    protected function hydrateHasManyRelation(HasManyRelation $relation, array $attributes): void
     {
-        foreach ($attributes[$availableRelation] as $relationData) {
-            if (!array_key_exists('type', $relationData)) {
-                throw new \InvalidArgumentException('Always provide a "type" attribute in a morphToMany relationship entry');
+        foreach ($attributes as $relationData) {
+            if (is_array($relationData)) {
+                $relationItem = $this->buildItem($relation->getType(), $relationData);
+            } else {
+                $relationItem = $this->buildItem($relation->getType(), ['id' => $relationData]);
             }
-            $relationItem = $this->buildRelationItem($relation, $relationData, $relationData['type']);
 
             $relation->associate($relation->getIncluded()->push($relationItem));
         }
     }
 
     /**
-     * @param \Swis\JsonApi\Client\Interfaces\RelationInterface $relation
-     * @param array                                             $relationData
-     * @param string|null                                       $type
+     * @param \Swis\JsonApi\Client\Relations\MorphToRelation $relation
+     * @param array                                          $attributes
      *
-     * @throws \Exception
-     *
-     * @return \Swis\JsonApi\Client\Items\JenssegersItem
+     * @throws \Swis\JsonApi\Client\Exceptions\HydrationException
      */
-    protected function buildRelationItem(RelationInterface $relation, array $relationData, string $type = null): JenssegersItem
+    protected function hydrateMorphToRelation(MorphToRelation $relation, array $attributes): void
     {
-        // Sometimes the relatedType is provided from the relationship, but not always (i.e. Polymorphic Relationships)
-        if (null === $type) {
-            $type = $relation->getType();
+        if (!array_key_exists('type', $attributes)) {
+            throw new HydrationException('Always provide a "type" attribute in a morphTo relationship');
         }
+        $relationItem = $this->buildItem($attributes['type'], Arr::except($attributes, 'type'));
 
+        $relation->associate($relationItem);
+    }
+
+    /**
+     * @param \Swis\JsonApi\Client\Relations\MorphToManyRelation $relation
+     * @param array                                              $attributes
+     *
+     * @throws \Swis\JsonApi\Client\Exceptions\HydrationException
+     */
+    protected function hydrateMorphToManyRelation(MorphToManyRelation $relation, array $attributes): void
+    {
+        foreach ($attributes as $relationData) {
+            if (!array_key_exists('type', $relationData)) {
+                throw new HydrationException('Always provide a "type" attribute in a morphToMany relationship entry');
+            }
+            $relationItem = $this->buildItem($relationData['type'], Arr::except($relationData, 'type'));
+
+            $relation->associate($relation->getIncluded()->push($relationItem));
+        }
+    }
+
+    /**
+     * @param string $type
+     * @param array  $attributes
+     *
+     * @throws \Swis\JsonApi\Client\Exceptions\HydrationException
+     *
+     * @return \Swis\JsonApi\Client\Interfaces\ItemInterface
+     */
+    protected function buildItem(string $type, array $attributes): ItemInterface
+    {
+        $item = (new Item())->setType($type);
         if ($this->typeMapper->hasMapping($type)) {
-            $relationItem = $this->typeMapper->getMapping($type);
-        } else {
-            $relationItem = new JenssegersItem();
-            $relationItem->setType($type);
+            $item = $this->typeMapper->getMapping($type);
         }
 
-        $this->fill($relationItem, $relationData);
-        $this->fillRelations($relationItem, $relationData);
-
-        $relationItem->setId($relationData['id']);
-
-        return $relationItem;
+        return $this->hydrate($item, $attributes, $attributes['id']);
     }
 }

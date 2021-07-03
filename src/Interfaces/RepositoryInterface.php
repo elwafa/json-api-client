@@ -5,39 +5,28 @@ namespace Swis\JsonApi\Client\Interfaces;
 interface RepositoryInterface
 {
     /**
-     * @throws \Swis\JsonApi\Client\Exceptions\DocumentTypeException
-     *
      * @return \Swis\JsonApi\Client\Interfaces\CollectionDocumentInterface
      */
     public function all();
 
     /**
-     * @param $id
-     *
-     * @throws \Swis\JsonApi\Client\Exceptions\DocumentTypeException
+     * @param string $id
      *
      * @return \Swis\JsonApi\Client\Interfaces\ItemDocumentInterface
      */
-    public function find($id);
+    public function find(string $id);
 
     /**
-     * @param \Swis\JsonApi\Client\Interfaces\ItemDocumentInterface $document
+     * @param \Swis\JsonApi\Client\Interfaces\ItemInterface $item
      *
      * @return \Swis\JsonApi\Client\Interfaces\ItemDocumentInterface
      */
-    public function save(ItemDocumentInterface $document);
+    public function save(ItemInterface $item);
 
     /**
-     * @param \Swis\JsonApi\Client\Interfaces\ItemDocumentInterface $document
+     * @param string $id
      *
      * @return \Swis\JsonApi\Client\Interfaces\DocumentInterface
      */
-    public function delete(ItemDocumentInterface $document);
-
-    /**
-     * @param $id
-     *
-     * @return \Swis\JsonApi\Client\Interfaces\DocumentInterface
-     */
-    public function deleteById($id);
+    public function delete(string $id);
 }

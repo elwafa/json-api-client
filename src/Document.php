@@ -2,29 +2,29 @@
 
 namespace Swis\JsonApi\Client;
 
-use Swis\JsonApi\Client\Errors\ErrorCollection;
+use Psr\Http\Message\ResponseInterface;
+use Swis\JsonApi\Client\Concerns\HasLinks;
+use Swis\JsonApi\Client\Concerns\HasMeta;
 use Swis\JsonApi\Client\Interfaces\DataInterface;
 use Swis\JsonApi\Client\Interfaces\DocumentInterface;
 
 class Document implements DocumentInterface
 {
+    use HasLinks;
+    use HasMeta;
+
+    /**
+     * @var \Psr\Http\Message\ResponseInterface|null
+     */
+    protected $response;
+
     /**
      * @var \Swis\JsonApi\Client\Interfaces\DataInterface
      */
     protected $data;
 
     /**
-     * @var array
-     */
-    protected $meta = [];
-
-    /**
-     * @var array
-     */
-    protected $links = [];
-
-    /**
-     * @var \Swis\JsonApi\Client\Errors\ErrorCollection
+     * @var \Swis\JsonApi\Client\ErrorCollection
      */
     protected $errors;
 
@@ -34,9 +34,9 @@ class Document implements DocumentInterface
     protected $included;
 
     /**
-     * @var array
+     * @var \Swis\JsonApi\Client\Jsonapi|null
      */
-    protected $jsonapi = [];
+    protected $jsonapi;
 
     public function __construct()
     {
@@ -45,39 +45,27 @@ class Document implements DocumentInterface
     }
 
     /**
-     * @return array
+     * @return \Psr\Http\Message\ResponseInterface|null
      */
-    public function getMeta(): array
+    public function getResponse(): ?ResponseInterface
     {
-        return $this->meta;
+        return $this->response;
     }
 
     /**
-     * @param array $meta
+     * @param \Psr\Http\Message\ResponseInterface|null $response
+     *
+     * @return $this
      */
-    public function setMeta(array $meta)
+    public function setResponse(?ResponseInterface $response)
     {
-        $this->meta = $meta;
+        $this->response = $response;
+
+        return $this;
     }
 
     /**
-     * @return array
-     */
-    public function getLinks(): array
-    {
-        return $this->links;
-    }
-
-    /**
-     * @param array $links
-     */
-    public function setLinks(array $links)
-    {
-        $this->links = $links;
-    }
-
-    /**
-     * @return \Swis\JsonApi\Client\Errors\ErrorCollection
+     * @return \Swis\JsonApi\Client\ErrorCollection
      */
     public function getErrors(): ErrorCollection
     {
@@ -85,11 +73,15 @@ class Document implements DocumentInterface
     }
 
     /**
-     * @param \Swis\JsonApi\Client\Errors\ErrorCollection $errors
+     * @param \Swis\JsonApi\Client\ErrorCollection $errors
+     *
+     * @return $this
      */
     public function setErrors(ErrorCollection $errors)
     {
         $this->errors = $errors;
+
+        return $this;
     }
 
     /**
@@ -98,6 +90,14 @@ class Document implements DocumentInterface
     public function hasErrors(): bool
     {
         return !$this->errors->isEmpty();
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSuccess(): bool
+    {
+        return $this->errors->isEmpty();
     }
 
     /**
@@ -111,7 +111,7 @@ class Document implements DocumentInterface
     /**
      * @param \Swis\JsonApi\Client\Collection $included
      *
-     * @return static
+     * @return $this
      */
     public function setIncluded(Collection $included)
     {
@@ -121,19 +121,23 @@ class Document implements DocumentInterface
     }
 
     /**
-     * @return array
+     * @return \Swis\JsonApi\Client\Jsonapi|null
      */
-    public function getJsonapi(): array
+    public function getJsonapi(): ?Jsonapi
     {
         return $this->jsonapi;
     }
 
     /**
-     * @param array $jsonapi
+     * @param \Swis\JsonApi\Client\Jsonapi|null $jsonapi
+     *
+     * @return $this
      */
-    public function setJsonapi(array $jsonapi)
+    public function setJsonapi(?Jsonapi $jsonapi)
     {
         $this->jsonapi = $jsonapi;
+
+        return $this;
     }
 
     /**
@@ -147,12 +151,82 @@ class Document implements DocumentInterface
     /**
      * @param \Swis\JsonApi\Client\Interfaces\DataInterface $data
      *
-     * @return static
+     * @return $this
      */
     public function setData(DataInterface $data)
     {
         $this->data = $data;
 
         return $this;
+    }
+
+    /**
+     * @return array
+     */
+    public function toArray(): array
+    {
+        $document = [];
+
+        if ($this->getLinks() !== null) {
+            $document['links'] = $this->getLinks()->toArray();
+        }
+
+        if ($this->getData() !== null) {
+            $document['data'] = $this->data->toJsonApiArray();
+        }
+
+        if ($this->getIncluded()->isNotEmpty()) {
+            $document['included'] = $this->getIncluded()->toJsonApiArray();
+        }
+
+        if ($this->getMeta() !== null) {
+            $document['meta'] = $this->getMeta()->toArray();
+        }
+
+        if ($this->hasErrors()) {
+            $document['errors'] = $this->getErrors()->toArray();
+        }
+
+        if ($this->getJsonapi() !== null) {
+            $document['jsonapi'] = $this->getJsonapi()->toArray();
+        }
+
+        return $document;
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * @return object
+     */
+    public function jsonSerialize()
+    {
+        $document = [];
+
+        if ($this->getLinks() !== null) {
+            $document['links'] = $this->getLinks();
+        }
+
+        if ($this->getData() !== null) {
+            $document['data'] = $this->data->toJsonApiArray();
+        }
+
+        if ($this->getIncluded()->isNotEmpty()) {
+            $document['included'] = $this->getIncluded()->toJsonApiArray();
+        }
+
+        if ($this->getMeta() !== null) {
+            $document['meta'] = $this->getMeta();
+        }
+
+        if ($this->hasErrors()) {
+            $document['errors'] = $this->getErrors();
+        }
+
+        if ($this->getJsonapi() !== null) {
+            $document['jsonapi'] = $this->getJsonapi();
+        }
+
+        return (object) $document;
     }
 }
