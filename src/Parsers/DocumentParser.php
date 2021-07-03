@@ -7,15 +7,15 @@ use Swis\JsonApi\Client\CollectionDocument;
 use Swis\JsonApi\Client\Document;
 use Swis\JsonApi\Client\Exceptions\ValidationException;
 use Swis\JsonApi\Client\Interfaces\DocumentInterface;
-use Swis\JsonApi\Client\Interfaces\DocumentParserInterface;
 use Swis\JsonApi\Client\Interfaces\ItemInterface;
 use Swis\JsonApi\Client\Interfaces\ManyRelationInterface;
 use Swis\JsonApi\Client\Interfaces\OneRelationInterface;
+use Swis\JsonApi\Client\Interfaces\ParserInterface;
 use Swis\JsonApi\Client\Interfaces\TypeMapperInterface;
 use Swis\JsonApi\Client\ItemDocument;
 use Swis\JsonApi\Client\TypeMapper;
 
-class DocumentParser implements DocumentParserInterface
+class DocumentParser implements ParserInterface
 {
     /**
      * @var \Swis\JsonApi\Client\Parsers\ItemParser
