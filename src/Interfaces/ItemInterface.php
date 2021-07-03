@@ -2,12 +2,15 @@
 
 namespace Swis\JsonApi\Client\Interfaces;
 
+use Swis\JsonApi\Client\Links;
+use Swis\JsonApi\Client\Meta;
+
 interface ItemInterface extends DataInterface
 {
     /**
-     * @return string
+     * @return string|null
      */
-    public function getId();
+    public function getId(): ?string;
 
     /**
      * @return bool
@@ -20,11 +23,11 @@ interface ItemInterface extends DataInterface
     public function isNew(): bool;
 
     /**
-     * @param string $id
+     * @param string|null $id
      *
      * @return static
      */
-    public function setId($id);
+    public function setId(?string $id);
 
     /**
      * @return string
@@ -32,11 +35,40 @@ interface ItemInterface extends DataInterface
     public function getType(): string;
 
     /**
+     * @return bool
+     */
+    public function hasType(): bool;
+
+    /**
      * @param string $type
      *
      * @return static
      */
     public function setType(string $type);
+
+    /**
+     * @param \Swis\JsonApi\Client\Links|null $links
+     *
+     * @return $this
+     */
+    public function setLinks(?Links $links);
+
+    /**
+     * @return \Swis\JsonApi\Client\Links|null
+     */
+    public function getLinks(): ?Links;
+
+    /**
+     * @param \Swis\JsonApi\Client\Meta|null $meta
+     *
+     * @return $this
+     */
+    public function setMeta(?Meta $meta);
+
+    /**
+     * @return \Swis\JsonApi\Client\Meta|null
+     */
+    public function getMeta(): ?Meta;
 
     /**
      * @param array $attributes
@@ -71,6 +103,23 @@ interface ItemInterface extends DataInterface
     public function setAttribute($key, $value);
 
     /**
+     * @param $key
+     *
+     * @return bool
+     */
+    public function hasAttribute($key): bool;
+
+    /**
+     * @return bool
+     */
+    public function hasAttributes(): bool;
+
+    /**
+     * @return bool
+     */
+    public function hasRelationships(): bool;
+
+    /**
      * @return array
      */
     public function getAvailableRelations(): array;
@@ -78,19 +127,17 @@ interface ItemInterface extends DataInterface
     /**
      * Set the specific relationship in the model.
      *
-     * @param string $relation
-     * @param mixed  $value
+     * @param string                                                   $relation
+     * @param \Swis\JsonApi\Client\Interfaces\DataInterface|false|null $value
+     * @param \Swis\JsonApi\Client\Links|null                          $links
+     * @param \Swis\JsonApi\Client\Meta|null                           $meta
      *
      * @return static
      */
-    public function setRelation($relation, $value);
+    public function setRelation(string $relation, $value = false, Links $links = null, Meta $meta = null);
 
     /**
-     * @TODO: MEGA TODO. Set up a serializer for the Item so that we can remove this, getRelationships etc
-     *
-     * @throws \Exception
-     *
-     * @return \Swis\JsonApi\Client\Collection
+     * @return \Swis\JsonApi\Client\Interfaces\OneRelationInterface[]|\Swis\JsonApi\Client\Interfaces\ManyRelationInterface[]
      */
-    public function getIncluded();
+    public function getRelations(): array;
 }

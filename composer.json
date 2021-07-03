@@ -1,22 +1,26 @@
 {
     "name": "swisnl/json-api-client",
     "type": "library",
-    "description": "A PHP package for mapping remote {json:api} resources to Eloquent like models and collections.",
+    "description": "A PHP package for mapping remote JSON:API resources to Eloquent like models and collections.",
     "require": {
-        "php": ">=7.0",
-        "art4/json-api-client": "^0.9.1",
-        "illuminate/support": "5.3.*|5.4.*|5.5.*",
+        "php": ">=7.1.3",
+        "ext-json": "*",
+        "illuminate/support": "^5.5|^6.0|^7.0|^8.0",
         "jenssegers/model": "^1.1",
-        "php-http/client-implementation": "^1.0",
-        "php-http/discovery": "^1.0"
+        "nyholm/psr7": "^1.2",
+        "php-http/discovery": "^1.0",
+        "psr/http-client": "^1.0",
+        "psr/http-client-implementation": "^1.0",
+        "psr/http-factory": "^1.0",
+        "psr/http-factory-implementation": "^1.0",
+        "psr/http-message": "^1.0"
     },
     "require-dev": {
-        "fzaninotto/faker": "^1.6",
-        "friendsofphp/php-cs-fixer": "^2.0",
-        "graham-campbell/testbench": "^4.0",
-        "phpunit/phpunit": "^6.1",
-        "php-http/guzzle6-adapter": "^1.1",
-        "php-http/mock-client": "^1.1"
+        "friendsofphp/php-cs-fixer": "^2.16",
+        "graham-campbell/testbench": "^5.3",
+        "phpunit/phpunit": "^6.5|^7.0|^8.0",
+        "php-http/guzzle6-adapter": "^2.0",
+        "php-http/mock-client": "^1.2"
     },
     "suggest": {
         "swisnl/php-http-fixture-client": "Allows for easily mocking API calls with fixtures in your tests"
@@ -56,7 +60,14 @@
         "laravel": {
             "providers": [
                 "Swis\\JsonApi\\Client\\Providers\\ServiceProvider"
-            ]
+            ],
+            "aliases":{
+                "DocumentFactory": "Swis\\JsonApi\\Client\\Facades\\DocumentFactoryFacade",
+                "DocumentParser": "Swis\\JsonApi\\Client\\Facades\\DocumentParserFacade",
+                "ItemHydrator": "Swis\\JsonApi\\Client\\Facades\\ItemHydratorFacade",
+                "ResponseParser": "Swis\\JsonApi\\Client\\Facades\\ResponseParserFacade",
+                "TypeMapper": "Swis\\JsonApi\\Client\\Facades\\TypeMapperFacade"
+            }
         }
     }
 }
