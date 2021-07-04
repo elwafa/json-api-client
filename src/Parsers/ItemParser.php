@@ -60,7 +60,7 @@ class ItemParser
         if (!is_string($data->type)) {
             throw new ValidationException(sprintf('Resource property "type" MUST be a string, "%s" given.', gettype($data->type)));
         }
-        if (!is_string($data->id) && !is_numeric($data->id)) {
+        if (!is_string($data->id) && !is_numeric($data->id) && !is_null($data->id)) {
             throw new ValidationException(sprintf('Resource property "id" MUST be a string, "%s" given.', gettype($data->id)));
         }
         if (property_exists($data, 'attributes')) {
